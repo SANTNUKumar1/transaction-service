@@ -10,33 +10,36 @@ import org.springframework.stereotype.Component;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.fasterxml.jackson.datatype.jsr310.JavaTimeModule;
+import com.paypal.transaction_service.entity.Transaction;
 
 @Component
 public class KafkaEventProducer {
 
     public static final String TOPIC = "txn-initiated";
 
-    public final KafkaTemplate<String,String> kafkaTemplate;
+    public final KafkaTemplate<String,Transaction> kafkaTemplate;
 
     private final ObjectMapper objectMapper;
 
     @Autowired
-    public KafkaEventProducer(KafkaTemplate<String, String> kafkaTemplate, ObjectMapper objectMapper) {
+    public KafkaEventProducer(KafkaTemplate<String, Transaction> kafkaTemplate, ObjectMapper objectMapper) {
         this.kafkaTemplate = kafkaTemplate;
         this.objectMapper = objectMapper;
 
         this.objectMapper.registerModule(new JavaTimeModule());
     }
 
-    public void sendTransactionEvent(String key,String message){
-         CompletableFuture<SendResult<String, String>> future =
-            kafkaTemplate.send(TOPIC, key, message);
-        
+    public void sendTransactionEvent(String key, Transaction transaction){
+        System.out.println("Sending to kafka ->Topic: " + TOPIC + ", Key: " + key + ", Transaction: " + transaction);
+        CompletableFuture<SendResult<String, Transaction>> future =
+            kafkaTemplate.send(TOPIC, key, transaction);
+
         future.thenAccept(result -> {
             RecordMetadata metadata = result.getRecordMetadata();
             System.out.println("Transaction event sent to topic: " + metadata.topic() + ", partition: " + metadata.partition() + ", offset: " + metadata.offset());
         }).exceptionally(ex -> {
             System.err.println("Failed to send transaction event: " + ex.getMessage());
+            ex.printStackTrace();
             return null;
         });
     }
